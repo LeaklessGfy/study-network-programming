@@ -6,17 +6,22 @@ import java.nio.ByteOrder;
 import java.nio.channels.DatagramChannel;
 import java.nio.charset.Charset;
 import java.util.Scanner;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
-public class ClientBetterUpperCaseUDP {
-	private static final int BUFFER_SIZE = 1024;
-	private static final int INT_SIZE = 4;
+public class ClientBetterUpperCaseUDPFaultTolerant {
+    private static final int BUFFER_SIZE = 1024;
+    private static final int INT_SIZE = 4;
 
     private static String decodeMessage(ByteBuffer buffer) {
+        int length = BUFFER_SIZE - buffer.remaining();
+        buffer.rewind();
+
         int size = buffer.getInt();
         byte[] charsetByte = new byte[size];
         buffer.get(charsetByte);
 
-        byte[] msg = new byte[buffer.remaining()];
+        byte[] msg = new byte[length - INT_SIZE - size];
         buffer.get(msg);
 
         String charset = new String(charsetByte, 0, size);
@@ -37,7 +42,7 @@ public class ClientBetterUpperCaseUDP {
         return bb;
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         if (args.length < 3) {
             throw new IllegalStateException("Bad usage: ClientBetterUpperCaseUDP.java [HOST] [PORT] [CHARSET]");
         }
@@ -48,7 +53,23 @@ public class ClientBetterUpperCaseUDP {
         String charset = args[2];
         SocketAddress address = new InetSocketAddress(host, port);
         DatagramChannel chan = DatagramChannel.open();
-        ByteBuffer bOut = ByteBuffer.allocateDirect(BUFFER_SIZE);
+        ArrayBlockingQueue<String> bq = new ArrayBlockingQueue<>(100);
+
+        new Thread(() -> {
+            ByteBuffer bOut = ByteBuffer.allocate(BUFFER_SIZE);
+
+            for (;;) {
+                try {
+                    chan.receive(bOut);
+                    String str = decodeMessage(bOut);
+                    bq.offer(str);
+                    bOut.clear();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return;
+                }
+            }
+        }).start();
 
         try (Scanner scanner = new Scanner(System.in)) {
             while (scanner.hasNextLine()) {
@@ -56,11 +77,13 @@ public class ClientBetterUpperCaseUDP {
                 bIn.flip();
                 chan.send(bIn, address);
 
-                bOut.clear();
-                chan.receive(bOut);
-                bOut.flip();
-
-                System.out.println(decodeMessage(bOut));
+                String str;
+                while ((str = bq.poll(1, TimeUnit.SECONDS)) == null) {
+                    System.out.println("\t** RETRY **");
+                    bIn.rewind();
+                    chan.send(bIn, address);
+                }
+                System.out.println("RESPONSE : " + str);
             }
         }
 

@@ -9,7 +9,7 @@ public class FileInspector {
 	private final static int BUFFER_SIZE = 8;
 	public static void main(String[] args) throws IOException {
 		if (args.length < 1) {
-			throw new IllegalStateException("Bad usage: p.java [INPUT]");
+			throw new IllegalStateException("Bad usage: FileInspector.java [INPUT]");
 		}
 		ByteChannel in = Files.newByteChannel(Paths.get(args[0]), StandardOpenOption.READ);
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);

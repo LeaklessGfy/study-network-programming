@@ -11,7 +11,7 @@ public class DoubleByteFileWriter {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
-            throw new IllegalStateException("Bad usage: p.java [INPUT] [OUTPUT]");
+            throw new IllegalStateException("Bad usage: DoubleByteFileWriter.java [INPUT] [OUTPUT]");
         }
 
         ByteChannel in = Files.newByteChannel(Paths.get(args[0]), StandardOpenOption.READ);

@@ -13,7 +13,7 @@ public class StoreWithByteOrder {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
-            throw new IllegalStateException("Bad usage: p.java [BYTEORDER: LE, BE] [OUTPUT]");
+            throw new IllegalStateException("Bad usage: StoreWithByteOrder.java [BYTEORDER: LE, BE] [OUTPUT]");
         }
 
         Path path = Paths.get(args[1]);

@@ -10,7 +10,7 @@ import java.util.Scanner;
 public class StoreWithEncoding {
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
-            throw new IllegalStateException("Bad usage: p.java [CHARSET] [OUTPUT]");
+            throw new IllegalStateException("Bad usage: StoreWithEncoding.java [CHARSET] [OUTPUT]");
         }
 
         Charset charset = Charset.forName(args[0]);
