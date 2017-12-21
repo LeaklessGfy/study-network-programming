@@ -1,28 +1,26 @@
 package fr.upem.net.udp;
 
-import org.omg.CORBA.TIMEOUT;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class BurstRequester extends Requester {
     private static final int TIMEOUT = 300;
-    private final ArrayBlockingQueue<ByteBuffer> responses = new ArrayBlockingQueue<>(10);
 
+    private final ArrayBlockingQueue<ByteBuffer> queue = new ArrayBlockingQueue<>(10);
     private final Thread listener = new Thread(() -> {
         while (!Thread.interrupted()) {
             try {
-                ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
-                receive(bb);
-                responses.offer(bb);
+                ByteBuffer res = ByteBuffer.allocate(BUFFER_SIZE);
+                receive(res);
+                res.flip();
+                queue.offer(res);
             } catch (IOException e) {
                 return;
             }
@@ -47,31 +45,53 @@ public class BurstRequester extends Requester {
 
     @Override
     public List<String> toUpperCase(List<String> lowerList, Charset charset) throws IOException, InterruptedException {
-        ArrayList<String> upperList = new ArrayList<>(lowerList.size());
+        String[] upperArray = new String[lowerList.size()];
         BitSet set = new BitSet(lowerList.size());
 
-        for (int i = 0; i < lowerList.size(); i++) {
-            int index = i;
-            new Thread(() -> {
+        new Thread(() -> {
+            for (int i = 0; i < lowerList.size(); i++) {
                 try {
-                    ByteBuffer req = createPacket(index, lowerList.get(index), charset);
-                    req.flip();
-                    send(req);
-
-                    ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
-                    receive(bb);
-                    bb.flip();
-                    upperList.add(index, decodeString(bb));
-                    set.set(index);
-                } catch (IOException e) {
-                    e.printStackTrace();
+                    sendFor(i, lowerList, charset);
+                    Thread.sleep(TIMEOUT);
+                } catch (IOException | InterruptedException e) {
+                    return;
                 }
-            }).start();
-            //sleep TIMEOUT
+            }
+        }).start();
+
+        for (int i = 0; i < lowerList.size(); i++) {
+            ByteBuffer res = queue.poll(TIMEOUT * 2, TimeUnit.MILLISECONDS);
+            if (res == null) {
+                System.out.println("\tTIMEOUT *" + i);
+                sendFor(i, lowerList, charset);
+                i--;
+                continue;
+            }
+
+            int id = (int) res.getLong();
+            if (id != i) {
+                if (upperArray[i] == null) {
+                    System.out.println("\tRETRY *" + i);
+                    sendFor(i, lowerList, charset);
+                    i--;
+                } else {
+                    continue;
+                }
+            }
+
+            System.out.println("Handle : " + id + " / " + i);
+
+            set.set(id);
+            res.rewind();
+            upperArray[id] = decodeString(res);
         }
 
-        //setStreamCheck
+        return Arrays.asList(upperArray);
+    }
 
-        return upperList;
+    private void sendFor(int index, List<String> lowerList, Charset charset) throws IOException {
+        ByteBuffer req = createPacket(index, lowerList.get(index), charset);
+        req.flip();
+        send(req);
     }
 }

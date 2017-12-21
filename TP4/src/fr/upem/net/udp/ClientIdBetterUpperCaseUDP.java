@@ -53,7 +53,7 @@ public class ClientIdBetterUpperCaseUDP {
 
         List<String> lines = readLinesFromFile(filename, charset);
 
-        try (Requester requester = new OneByOneRequester(address)) {
+        try (Requester requester = new BurstRequester(address)) {
             requester.open();
             List<String> linesUpperCase = requester.toUpperCase(lines, charset);
             writeLinesToFile(linesUpperCase,filename + ".UPPERCASE", charset);
